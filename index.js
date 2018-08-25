@@ -431,7 +431,7 @@ var paymentListener = async () => {
       .cursor('now')
       .stream({
         onmessage: function(payment) { 
-          console.log(payment)
+          console.log(payment.amount)
         },
         onerror: function(error) {
           console.log('Error:', error);
