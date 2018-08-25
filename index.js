@@ -422,8 +422,30 @@ const MakePayment = async(senderSecret,receiverPublicKey,paymentAmount,Token) =>
  }
 }
 
+var paymentListener = async () => {
+
+  try{
+    var server = new StellarSdk.Server('https://horizon-testnet.stellar.org');
+    var paymentStream = server.payments()
+      .forAccount('GDVYOD3NVMGDSBAOLGXPNPHACBKAGQJDM5XSAEEWKMYB2EGLKDXMWAJU')// take account from redis
+      .cursor('now')
+      .stream({
+        onmessage: function(payment) { 
+          console.log(payment)
+        },
+        onerror: function(error) {
+          console.log('Error:', error);
+          throw error;
+        }
+      });
+    }
+    catch(error){
+      console.log('Error:', error);
+    }
+}
 
 app.listen(4000,()=>{
     console.log(4000+" portu dinleniyor");
+    paymentListener();
 });
   
