@@ -12,7 +12,6 @@ const app = express();
 var bodyParser = require('body-parser');
 
 app.use(cors());
-app.use(bodyParser.json({limit:1024*1024,type:'application/json'}));
 
 balanceObject = {};
 var publicKey;
@@ -445,7 +444,7 @@ var paymentListener = async () => {
 }
 
 app.listen(4000,()=>{
-    console.log(4000+" portu dinleniyor");
+    console.log(4000+" listening");
     paymentListener();
 });
   
