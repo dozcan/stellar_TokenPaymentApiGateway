@@ -7,8 +7,6 @@ const helper = require('./helper.js');
 const responseMaker =require('./responseMaker.js');
 const requestTypeError = require('./enum.js');
 const cors = require('cors');
-//veri blockchain üzerinde sıkıştırılmış tutuluyor daha sonra hash değeri tutulacak
-var zlib = require('zlib');
 var express = require('express');
 const app = express();
 var bodyParser = require('body-parser');
@@ -20,6 +18,7 @@ balanceObject = {};
 var publicKey;
 var secret;
 var Token;
+var listenReceiverPayment;
 
 
 const AccountCreate = async() => {
@@ -70,7 +69,7 @@ app.get('/AccountCreate',function(req,res){
       }
       catch(err)
       {
-        errorCode = requestTypeError.account_create;
+        errorCode = requestTypeError.transactional_error;
         errorMessage =  helper.error(errorCode,err);
         response = responseMaker.responseErrorMaker(errorCode,errorMessage);
         res.send(response);
@@ -113,7 +112,7 @@ app.post('/GetAsset',function(req,res){
     }
     catch(err)
     {
-      errorCode = requestTypeError.account_create;
+      errorCode = requestTypeError.transactional_error;
       errorMessage =  helper.error(errorCode,err);
       response = responseMaker.responseErrorMaker(errorCode,errorMessage);
       res.send(response);
@@ -127,7 +126,6 @@ app.post('/GetBalance',function(req,res){
   var create = async() =>{
     try
     {
-
       var publicKey = JSON.stringify(req.body.publicKey); 
       publicKey = helper.cleanWhiteCharacter(publicKey);
 
@@ -152,7 +150,7 @@ app.post('/GetBalance',function(req,res){
     }
     catch(err)
     {
-      errorCode = requestTypeError.account_create;
+      errorCode = requestTypeError.transactional_error;
       errorMessage =  helper.error(errorCode,err);
       response = responseMaker.responseErrorMaker(errorCode,errorMessage);
       res.send(response);
@@ -166,14 +164,14 @@ app.post('/TokenCreate',function(req,res){
 const set = async() =>{
 
   try{
+   
     var issuerSecret = JSON.stringify(req.body.issuerSecret); 
     issuerSecret = helper.cleanWhiteCharacter(issuerSecret);
-    var receiverSecret = JSON.stringify(req.body.receiverSecret); 
+    var receiverSecret = JSON.stringify(req.body.receiverSecret);
     receiverSecret = helper.cleanWhiteCharacter(receiverSecret);
 
     var issuingKeys = StellarSdk.Keypair.fromSecret(issuerSecret);
     var receivingKeys = StellarSdk.Keypair.fromSecret(receiverSecret);
-
     var assetcode = "MTP";
     StellarSdk.Network.useTestNetwork();
     Token = new StellarSdk.Asset(assetcode,issuingKeys.publicKey());      
@@ -217,7 +215,7 @@ const set = async() =>{
   }
   
   catch(err){
-    errorCode = requestTypeError.identity;
+    errorCode = requestTypeError.transactional_error;
     errorMessage = helper.error(errorCode,err);
     response = responseMaker.responseErrorMaker(errorCode,errorMessage);
     res.send(response);
@@ -242,7 +240,10 @@ app.post('/DepositToken',function(req,res){
     tokenBuyerSecret = helper.cleanWhiteCharacter(tokenBuyerSecret);
     var tokenBuyerKeys = StellarSdk.Keypair.fromSecret(tokenBuyerSecret);
 
-    Token = new StellarSdk.Asset(assetcode,issuingKeys.publicKey()); 
+    var tokenIssuerPublicKey = JSON.stringify(req.body.tokenIssuerPublicKey); 
+    tokenIssuerPublicKey = helper.cleanWhiteCharacter(tokenIssuerPublicKey);
+
+    Token = new StellarSdk.Asset("MTP",tokenIssuerPublicKey); 
     var amount = JSON.stringify(req.body.amount); 
     amount = helper.cleanWhiteCharacter(amount);
     var transaction;
@@ -257,7 +258,7 @@ app.post('/DepositToken',function(req,res){
         }
 
     var tokenHolderKeysPublicKey = tokenHolderKeys.publicKey();
-    server.loadAccount(tokenHolderKeysPublicKey).then(function(account)
+    await server.loadAccount(tokenHolderKeysPublicKey).then(function(account)
     {
         var transaction = new StellarSdk.TransactionBuilder(account)
         .addOperation(StellarSdk.Operation.manageOffer(op)).build();
@@ -285,7 +286,7 @@ app.post('/DepositToken',function(req,res){
       
   /////////////////////////////////make payment//////////////////////////////////////////////
 
-   server.loadAccount(tokenBuyerKeys.publicKey()).then(function(receiver)
+   await server.loadAccount(tokenBuyerKeys.publicKey()).then(function(receiver)
    {
         var transaction = new StellarSdk.TransactionBuilder(receiver)
         .addOperation(StellarSdk.Operation.changeTrust({
@@ -328,7 +329,7 @@ app.post('/DepositToken',function(req,res){
    }
    catch(error)
    {
-        errorCode = requestTypeError.account_create;
+        errorCode = requestTypeError.transactional_error;
         errorMessage =  helper.error(errorCode,error);
         response = responseMaker.responseErrorMaker(errorCode,errorMessage);
         res.send(response);
@@ -348,9 +349,14 @@ app.post('/MakePayment',function(req,res){
       let paymentAmount = JSON.stringify(req.body.paymentAmount);
       senderSecret = helper.cleanWhiteCharacter(senderSecret);
       receiverPublicKey = helper.cleanWhiteCharacter(receiverPublicKey);
+      listenReceiverPayment = receiverPublicKey;
       paymentAmount = helper.cleanWhiteCharacter(paymentAmount);
+      var tokenIssuerPublicKey = JSON.stringify(req.body.tokenIssuerPublicKey); 
+      tokenIssuerPublicKey = helper.cleanWhiteCharacter(tokenIssuerPublicKey);
+  
+      Token = new StellarSdk.Asset("MTP",tokenIssuerPublicKey); 
 
-      let result = await MakePayment(senderSecret,receiverPublicKey,paymentAmount);
+      let result = await MakePayment(senderSecret,receiverPublicKey,paymentAmount,Token);
       key = ["result"];
       value = [result];
       rawResponseObject = responseMaker.createResponse(key,value);
@@ -359,7 +365,7 @@ app.post('/MakePayment',function(req,res){
     }
     catch(err)
     {
-      errorCode = requestTypeError.account_create;
+      errorCode = requestTypeError.transactional_error;
       errorMessage =  helper.error(errorCode,err);
       response = responseMaker.responseErrorMaker(errorCode,errorMessage);
       res.send(response);
@@ -367,7 +373,8 @@ app.post('/MakePayment',function(req,res){
   }
   create();
 });
-const MakePayment = async(senderSecret,receiverPublicKey,paymentAmount) =>{
+
+const MakePayment = async(senderSecret,receiverPublicKey,paymentAmount,Token) =>{
 
  try{
 
@@ -377,13 +384,11 @@ const MakePayment = async(senderSecret,receiverPublicKey,paymentAmount) =>{
   var destinationId = receiverPublicKey;
   var transaction;
   console.log("1");
-  await server.loadAccount(destinationId)
+  var _result = await server.loadAccount(destinationId)
     .catch(StellarSdk.NotFoundError, function (error) {
-      console.log("2");
       throw new Error('The destination account does not exist!');
     })
     .then(function() {
-      console.log("3");
       return server.loadAccount(sourceKeys.publicKey());
     })
     .then(function(sourceAccount) {
@@ -409,14 +414,13 @@ const MakePayment = async(senderSecret,receiverPublicKey,paymentAmount) =>{
       console.error('Something went wrong!', error);
       throw error;
     });
+
+    return _result;
  }
  catch(err){
    throw err;
  }
-
-
 }
- 
 
 
 app.listen(4000,()=>{
