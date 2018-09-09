@@ -12,6 +12,7 @@
     "cors": "^2.8.4",
     "express": "^4.16.3",
     "node-gyp": "^3.8.0",
+    "redis": "^2.8.0",
     "request-promise": "^4.2.2",
     "scrypt": "^6.0.3",
     "stellar-sdk": "^0.10.3"

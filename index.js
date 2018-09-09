@@ -9,6 +9,8 @@ const requestTypeError = require('./enum.js');
 const cors = require('cors');
 const app = express();
 var bodyParser = require('body-parser');
+var redis = require("redis"),
+client = redis.createClient('6379',process.env.REDIS_IP);
 
 app.use(cors());
 app.use(bodyParser.json({limit:1024*1024,type:'application/json'}));
@@ -17,8 +19,8 @@ balanceObject = {};
 var publicKey;
 var secret;
 var Token;
+var xdrObj;
 var listenReceiverPayment;
-
 
 const AccountCreate = async() => {
 
@@ -31,21 +33,25 @@ const AccountCreate = async() => {
       uri: 'https://horizon-testnet.stellar.org/friendbot',
       qs: { addr: pair.publicKey() },
       json: true
-    }).then((response, second) => {
-    }).then(() => {
+    })
+    .then((response, second) => {
+    })
+    .then(() => {
       const server = new StellarSdk.Server('https://horizon-testnet.stellar.org');
       return server.loadAccount(pair.publicKey())
-    }).then((account) => {
-      account.balances.forEach(function(balance) {
+    })
+    .then((account) => {
+        account.balances.forEach(function(balance) {
         console.log('Type:', balance.asset_type, ', Balance:', balance.balance);
         balanceObject.asset_type = balance.asset_type;
         balanceObject.balance = balance.balance;
         balanceObject.publicKey = pair.publicKey();
         balanceObject.secret = pair.secret()
       });
-  }).catch((err) => { 
-    console.log(err) 
-    throw err; 
+    })
+    .catch((err) => { 
+      console.log(err) 
+      throw err; 
   })
 
   }
@@ -78,14 +84,11 @@ app.get('/AccountCreate',function(req,res){
 });
 
 app.post('/GetAsset',function(req,res){
-  
-  var create = async() =>{
+
+var create = async() =>{
     try
     {
-
-      var publicKey = JSON.stringify(req.body.publicKey); 
-      publicKey = helper.cleanWhiteCharacter(publicKey);
-
+      var publicKey = await getFromRedis();
       var response;
       await request.get({
         uri: 'https://horizon-testnet.stellar.org/assets/',
@@ -97,6 +100,7 @@ app.post('/GetAsset',function(req,res){
       }).then(function(data){
          console.log(data);
          response = data;
+         Token = response;
       }).catch(function(err){
         console.log(err);
         throw err;
@@ -132,10 +136,12 @@ app.post('/GetBalance',function(req,res){
       await request.get({
         uri: 'https://horizon-testnet.stellar.org/accounts/'+publicKey+'/effects',
         json: true
-      }).then(function(data){
+      })
+      .then(function(data){
          console.log(data);
          response = data;
-      }).catch(function(err){
+      })
+      .catch(function(err){
         console.log(err);
         throw err;
       });
@@ -173,11 +179,16 @@ const set = async() =>{
     var receivingKeys = StellarSdk.Keypair.fromSecret(receiverSecret);
     var assetcode = "MTP";
     StellarSdk.Network.useTestNetwork();
-    Token = new StellarSdk.Asset(assetcode,issuingKeys.publicKey());      
+    Token = new StellarSdk.Asset(assetcode,issuingKeys.publicKey());   
+    xdrObj = Token.toXDRObject();
+    Token = StellarSdk.Asset.fromOperation(xdrObj);
     const server = new StellarSdk.Server('https://horizon-testnet.stellar.org');
     var transaction;
-    await server.loadAccount(receivingKeys.publicKey()).then(function(receiver){
-
+    client.set("publickey",issuingKeys.publicKey(),redis.print);
+    await server.loadAccount(
+      receivingKeys.publicKey()
+    )
+    .then(function(receiver){
         var transaction = new StellarSdk.TransactionBuilder(receiver)
         .addOperation(StellarSdk.Operation.changeTrust({
           asset: Token,
@@ -185,12 +196,10 @@ const set = async() =>{
         })).build();
         transaction.sign(receivingKeys);
         return server.submitTransaction(transaction);
-    })
-    
+    })  
     .then(function() {
       return server.loadAccount(issuingKeys.publicKey())
-    })
-    
+    }) 
     .then(function(issuer) {
         transaction = new StellarSdk.TransactionBuilder(issuer)
         .addOperation(StellarSdk.Operation.payment({
@@ -225,6 +234,20 @@ set();
 
 });
 
+const getFromRedis = async()=>{
+  try{ 
+  var promise = new Promise((resolve,rejec)=>{
+      client.get("publickey",function(error,data){
+      if(error) throw error;
+      resolve(data);
+    });
+  });
+  return promise;
+  }
+  catch(error){
+    throw error;
+  }     
+}
 
 app.post('/DepositToken',function(req,res){
    
@@ -239,15 +262,18 @@ app.post('/DepositToken',function(req,res){
     tokenBuyerSecret = helper.cleanWhiteCharacter(tokenBuyerSecret);
     var tokenBuyerKeys = StellarSdk.Keypair.fromSecret(tokenBuyerSecret);
 
-    var tokenIssuerPublicKey = JSON.stringify(req.body.tokenIssuerPublicKey); 
-    tokenIssuerPublicKey = helper.cleanWhiteCharacter(tokenIssuerPublicKey);
+    var tokenIssuerPublicKey;
 
-    Token = new StellarSdk.Asset("MTP",tokenIssuerPublicKey); 
     var amount = JSON.stringify(req.body.amount); 
     amount = helper.cleanWhiteCharacter(amount);
     var transaction;
     var server = new StellarSdk.Server('https://horizon-testnet.stellar.org');
-    console.log(Token);
+ 
+    tokenIssuerPublicKey = await getFromRedis();
+    console.log(tokenIssuerPublicKey);
+
+    var Token = new StellarSdk.Asset("MTP",tokenIssuerPublicKey).toXDRObject();
+    Token = StellarSdk.Asset.fromOperation(Token);
     var op ={
           selling: Token,
           buying: new StellarSdk.Asset.native(),
@@ -257,15 +283,14 @@ app.post('/DepositToken',function(req,res){
         }
 
     var tokenHolderKeysPublicKey = tokenHolderKeys.publicKey();
-    await server.loadAccount(tokenHolderKeysPublicKey).then(function(account)
-    {
+    await server.loadAccount(tokenHolderKeysPublicKey)
+    .then(function(account){
         var transaction = new StellarSdk.TransactionBuilder(account)
         .addOperation(StellarSdk.Operation.manageOffer(op)).build();
-
         transaction.sign(tokenHolderKeys);
         console.log(transaction.toEnvelope().toXDR('base64'));
-        server.submitTransaction(transaction).then(function(transactionResult) 
-        {
+        server.submitTransaction(transaction)
+        .then(function(transactionResult) {
             console.log(JSON.stringify(transactionResult, null, 2));
             console.log('\nSuccess! View the transaction at: ');
             console.log(transactionResult._links.transaction.href);
@@ -281,12 +306,10 @@ app.post('/DepositToken',function(req,res){
         throw err;
       });
 
-  
-      
   /////////////////////////////////make payment//////////////////////////////////////////////
 
-   await server.loadAccount(tokenBuyerKeys.publicKey()).then(function(receiver)
-   {
+   await server.loadAccount(tokenBuyerKeys.publicKey())
+    .then(function(receiver){
         var transaction = new StellarSdk.TransactionBuilder(receiver)
         .addOperation(StellarSdk.Operation.changeTrust({
           asset: Token
@@ -295,14 +318,10 @@ app.post('/DepositToken',function(req,res){
         transaction.sign(tokenBuyerKeys);
         return server.submitTransaction(transaction);
     })
-    
-    .then(function() 
-    {
+    .then(function() {
         return server.loadAccount(tokenHolderKeys.publicKey())
     })
-    
-    .then(function(issuer) 
-    {
+    .then(function(issuer) {
         transaction = new StellarSdk.TransactionBuilder(issuer)
         .addOperation(StellarSdk.Operation.payment({
           destination: tokenBuyerKeys.publicKey(),
@@ -324,7 +343,6 @@ app.post('/DepositToken',function(req,res){
     response = responseMaker.responseMaker(rawResponseObject);
     res.send(response);  
  
-
    }
    catch(error)
    {
@@ -382,8 +400,14 @@ const MakePayment = async(tokenHolderSecret,tokenBuyerSecret,paymentAmount) =>{
   var tokenBuyer = StellarSdk.Keypair.fromSecret(tokenBuyerSecret);;
   var transaction;
  
-  await server.loadAccount(tokenBuyer.publicKey()).then(function(receiver)
-  {
+  var tokenIssuerPublicKey = await getFromRedis();
+  console.log(tokenIssuerPublicKey);
+
+  var Token = new StellarSdk.Asset("MTP",tokenIssuerPublicKey).toXDRObject();
+  Token = StellarSdk.Asset.fromOperation(Token);
+
+  await server.loadAccount(tokenBuyer.publicKey())
+  .then(function(receiver){
        var transaction = new StellarSdk.TransactionBuilder(receiver)
        .addOperation(StellarSdk.Operation.changeTrust({
          asset: Token
@@ -392,12 +416,9 @@ const MakePayment = async(tokenHolderSecret,tokenBuyerSecret,paymentAmount) =>{
        transaction.sign(tokenBuyer);
        return server.submitTransaction(transaction);
    })
-   
-   .then(function() 
-   {
+   .then(function(){
        return server.loadAccount(tokenHolder.publicKey())
    })
-   
    .then(function(issuer) 
    {
        transaction = new StellarSdk.TransactionBuilder(issuer)
@@ -428,7 +449,7 @@ var paymentListener = async () => {
       .cursor('now')
       .stream({
         onmessage: function(payment) { 
-          console.log(payment.amount)
+          console.log(payment.amount) // send to kafka
         },
         onerror: function(error) {
           console.log('Error:', error);
