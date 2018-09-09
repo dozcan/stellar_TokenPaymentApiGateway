@@ -8,10 +8,10 @@
 directives:
 
 1) AccountCreate => http://localhost:4000/AccountCreate
-2) TokenCreate => http://localhost:4000/TokenCreate  
+2) TokenCreate =>    http://localhost:4000/TokenCreate  
 {
   "issuerSecret"	 :"SB552A3K5HEUH6YHJHV5SGZJSFR72ADSPN4HCEBVPCHLR23WKQRYWT72",
-  "receiverSecret" :"SDX52WX4Y4DWXX4IXAJQSIQHTDJ77X7Q6GH5K3C3VOZADLV3BUMPF5L7"
+  "receiverSecret"       :"SDX52WX4Y4DWXX4IXAJQSIQHTDJ77X7Q6GH5K3C3VOZADLV3BUMPF5L7"
 }
 
 3) GetAsset =>  http://localhost:4000/GetAsset 
@@ -28,13 +28,11 @@ directives:
 {
 	"tokenHolderSecret":"SDX52WX4Y4DWXX4IXAJQSIQHTDJ77X7Q6GH5K3C3VOZADLV3BUMPF5L7",
 	"tokenBuyerSecret":"SAOECU5PRMDMNMQK5RR3FLJQUJJNNMTILQBUMAQWY27BY7H7Z6WFJP2B",
-	"tokenIssuerPublicKey" : "GAATZY5JR6SKJ72VIQ6UZDHKJSJMVC2F5TAKCSJSRFVCDYBFGJOSX3J3",
-   "amount":"35"
+        "amount":"35"
 }
 6) MakePayment => http://localhost:4000/MakePayment
 {
 	"receiverPublicKey":"GDVYOD3NVMGDSBAOLGXPNPHACBKAGQJDM5XSAEEWKMYB2EGLKDXMWAJU",
 	"senderSecret":"SDX52WX4Y4DWXX4IXAJQSIQHTDJ77X7Q6GH5K3C3VOZADLV3BUMPF5L7",
-	"tokenIssuerPublicKey" : "GAATZY5JR6SKJ72VIQ6UZDHKJSJMVC2F5TAKCSJSRFVCDYBFGJOSX3J3",
-    "paymentAmount":"3010"
+        "paymentAmount":"3010"
 }
