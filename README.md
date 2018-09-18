@@ -4,6 +4,7 @@
 2) stellar network is divided into 2 : public and test
 3) this project is mobile payment systems backend project
 4) newly created token will be settled in the dockerize redis db.
+5) kafka implementation will be settled for the real time payment monitoring
 
 directives:
 
