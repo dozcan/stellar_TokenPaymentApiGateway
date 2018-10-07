@@ -38,4 +38,4 @@ directives:
         "paymentAmount":"3010"
 }
 
-for building api => sudo docker build -t api . for running api => sudo docker run -d -e REDIS_IP=34.208.235.93 -p 6000:6000 api
+for building api => sudo docker build -t api . for running api => sudo docker run -d -e REDIS_IP=34.208.235.93 -p 4000:4000 api
