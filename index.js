@@ -10,8 +10,8 @@ const cors = require('cors');
 const app = express();
 var bodyParser = require('body-parser');
 var redis = require("redis"),
-client = redis.createClient('6379',process.env.REDIS_IP);
-
+//client = redis.createClient('6379',process.env.REDIS_IP);
+client = redis.createClient('6379','34.208.235.93');
 app.use(cors());
 app.use(bodyParser.json({limit:1024*1024,type:'application/json'}));
 
@@ -184,7 +184,7 @@ const set = async() =>{
     Token = StellarSdk.Asset.fromOperation(xdrObj);
     const server = new StellarSdk.Server('https://horizon-testnet.stellar.org');
     var transaction;
-    client.set("publickey",issuingKeys.publicKey(),redis.print);
+    //client.set("publickey",issuingKeys.publicKey(),redis.print);
     await server.loadAccount(
       receivingKeys.publicKey()
     )
@@ -262,14 +262,18 @@ app.post('/DepositToken',function(req,res){
     tokenBuyerSecret = helper.cleanWhiteCharacter(tokenBuyerSecret);
     var tokenBuyerKeys = StellarSdk.Keypair.fromSecret(tokenBuyerSecret);
 
-    var tokenIssuerPublicKey;
+    var issuerSecret = JSON.stringify(req.body.issuerSecret); 
+    issuerSecret = helper.cleanWhiteCharacter(issuerSecret);
+    var issuingKeys = StellarSdk.Keypair.fromSecret(issuerSecret);
+    
+    var tokenIssuerPublicKey  = issuingKeys.publicKey();
 
     var amount = JSON.stringify(req.body.amount); 
     amount = helper.cleanWhiteCharacter(amount);
     var transaction;
     var server = new StellarSdk.Server('https://horizon-testnet.stellar.org');
  
-    tokenIssuerPublicKey = await getFromRedis();
+    //tokenIssuerPublicKey = await getFromRedis();
     console.log(tokenIssuerPublicKey);
 
     var Token = new StellarSdk.Asset("MTP",tokenIssuerPublicKey).toXDRObject();
@@ -368,11 +372,17 @@ app.post('/MakePayment',function(req,res){
       var tokenBuyerSecret = JSON.stringify(req.body.tokenBuyerSecret); 
       tokenBuyerSecret = helper.cleanWhiteCharacter(tokenBuyerSecret);
       var tokenBuyerKeys = StellarSdk.Keypair.fromSecret(tokenBuyerSecret);
+      
+      var issuerSecret = JSON.stringify(req.body.issuerSecret); 
+      issuerSecret = helper.cleanWhiteCharacter(issuerSecret);
+      var issuingKeys = StellarSdk.Keypair.fromSecret(issuerSecret);
+    
+      var tokenIssuerPublicKey  = issuingKeys.publicKey();
 
       var paymentAmount = JSON.stringify(req.body.paymentAmount); 
       paymentAmount = helper.cleanWhiteCharacter(paymentAmount);
   
-      let result = await MakePayment(tokenHolderSecret,tokenBuyerSecret,paymentAmount);
+      let result = await MakePayment(tokenIssuerPublicKey,tokenHolderSecret,tokenBuyerSecret,paymentAmount);
       key = ["result"];
       value = [result];
       rawResponseObject = responseMaker.createResponse(key,value);
@@ -390,7 +400,7 @@ app.post('/MakePayment',function(req,res){
   create();
 });
 
-const MakePayment = async(tokenHolderSecret,tokenBuyerSecret,paymentAmount) =>{
+const MakePayment = async(tokenIssuerPublicKey,tokenHolderSecret,tokenBuyerSecret,paymentAmount) =>{
 
  try{
 
@@ -400,7 +410,7 @@ const MakePayment = async(tokenHolderSecret,tokenBuyerSecret,paymentAmount) =>{
   var tokenBuyer = StellarSdk.Keypair.fromSecret(tokenBuyerSecret);;
   var transaction;
  
-  var tokenIssuerPublicKey = await getFromRedis();
+  //var tokenIssuerPublicKey = await getFromRedis();
   console.log(tokenIssuerPublicKey);
 
   var Token = new StellarSdk.Asset("MTP",tokenIssuerPublicKey).toXDRObject();
