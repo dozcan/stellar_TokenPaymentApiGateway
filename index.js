@@ -440,7 +440,8 @@ const MakePayment = async(tokenHolderSecret,tokenBuyerSecret,paymentAmount) =>{
  }
 }
 
-var paymentListener = async () => {
+
+/*var paymentListener = async () => {
 
   try{
     var server = new StellarSdk.Server('https://horizon-testnet.stellar.org');
@@ -461,9 +462,9 @@ var paymentListener = async () => {
       console.log('Error:', error);
     }
 }
-
+*/
 app.listen(4000,()=>{
     console.log(4000+" listening");
-    paymentListener();
+    //paymentListener();
 });
   
