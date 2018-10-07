@@ -37,3 +37,5 @@ directives:
 	"senderSecret":"SDX52WX4Y4DWXX4IXAJQSIQHTDJ77X7Q6GH5K3C3VOZADLV3BUMPF5L7",
         "paymentAmount":"3010"
 }
+
+for building api => sudo docker build -t api . for running api => sudo docker run -d -e REDIS_IP=34.208.235.93 -p 6000:6000 api
