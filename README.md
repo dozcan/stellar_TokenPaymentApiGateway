@@ -1,4 +1,6 @@
 this is doga ozcan's own works for stellar payment engine...
+be aware of mit license of Doga Ozcan:)
+please learn appyl but don distribute on commercial meta
 
 1) this code create a new token on stellar network and make payment system with created token
 2) stellar network is divided into 2 : public and test
